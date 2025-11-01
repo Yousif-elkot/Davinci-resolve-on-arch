@@ -1,48 +1,214 @@
-# DaVinci Resolve Transcoder
+# DaVinci Resolve on Arch Linux (Hyprland)
 
-A bash script that converts video and audio files to a format compatible with DaVinci Resolve using FFmpeg.
+![Arch Linux](https://img.shields.io/badge/Arch%20Linux-1793D1?style=for-the-badge&logo=arch-linux&logoColor=white)
+![DaVinci Resolve](https://img.shields.io/badge/DaVinci%20Resolve-233A51?style=for-the-badge&logo=davinci-resolve&logoColor=white)
+![Hyprland](https://img.shields.io/badge/Hyprland-00B4D8?style=for-the-badge&logo=wayland&logoColor=white)
+![FFmpeg](https://img.shields.io/badge/FFmpeg-007808?style=for-the-badge&logo=ffmpeg&logoColor=white)
 
-## What it does
+A complete guide for installing and configuring DaVinci Resolve on Arch Linux, specifically tested on Hyprland. This repository includes installation steps, troubleshooting solutions, and a transcoding script for media compatibility.
 
-This script transcodes media files using the following FFmpeg parameters:
+## ✨ Features
+
+- ✅ **Complete installation guide** for Arch Linux (Hyprland tested)
+- ✅ **GPU driver setup** with OpenCL support
+- ✅ **Common issues solved** with step-by-step fixes
+- ✅ **Automated transcoding script** for media compatibility
+- ✅ **ProRes 422 HQ conversion** for optimal editing performance
+- ✅ **Codec licensing explained** - why H.264/H.265 don't work on Linux
+
+## 🎬 Video Tutorial
+
+A complete video tutorial is coming soon, demonstrating the entire installation and setup process on Hyprland!
+
+## Table of Contents
+
+- [Quick Start](#quick-start)
+- [Installation](#installation)
+  - [1. Download DaVinci Resolve](#1-download-davinci-resolve)
+  - [2. Install GPU Drivers (OpenCL)](#2-install-gpu-drivers-opencl)
+  - [3. Install DaVinci Resolve](#3-install-davinci-resolve)
+- [Troubleshooting](#troubleshooting)
+  - [Symbol Lookup Error Fix](#symbol-lookup-error-fix)
+  - [Media Compatibility Issues](#media-compatibility-issues)
+- [Transcoding Script](#transcoding-script)
+- [Usage](#usage)
+
+---
+
+## Quick Start
+
+For those who want to get started immediately:
+
+```bash
+# 1. Install OpenCL drivers (choose based on your GPU)
+sudo pacman -S opencl-nvidia  # For NVIDIA
+# OR
+sudo pacman -S opencl-amd     # For AMD
+# OR
+sudo pacman -S intel-compute-runtime  # For Intel
+
+# 2. Download and install DaVinci Resolve from:
+# https://www.blackmagicdesign.com/products/davinciresolve
+
+# 3. Fix library conflicts (if you get symbol lookup errors)
+cd /opt/resolve/libs
+sudo mkdir disabled-libraries
+sudo mv libglib* libgio* libgmodule* disabled-libraries
+
+# 4. Install FFmpeg for media transcoding
+sudo pacman -S ffmpeg
+
+# 5. Clone this repo and set up the transcode script
+git clone https://github.com/Yousif-elkot/Davinci-resolve-on-arch.git
+cd Davinci-resolve-on-arch
+chmod +x transcode.sh
+sudo ln -sf $(pwd)/transcode.sh /usr/local/bin/davinci-transcode
+
+# 6. Transcode your media files
+davinci-transcode your_video.mp4
+```
+
+For detailed instructions and explanations, continue reading below.
+
+---
+
+## Installation
+
+### 1. Download DaVinci Resolve
+
+Download DaVinci Resolve from the official Blackmagic Design website:
+
+**[Download DaVinci Resolve](https://www.blackmagicdesign.com/products/davinciresolve)**
+
+Choose either the free version or DaVinci Resolve Studio depending on your needs.
+
+> **Note:** This guide works for both the free and Studio versions. However, be aware that the free version has codec limitations on Linux (see [Media Compatibility Issues](#media-compatibility-issues)).
+
+### 2. Install GPU Drivers (OpenCL)
+
+DaVinci Resolve requires OpenCL support for GPU acceleration. Follow the Arch Wiki guide for your specific GPU:
+
+**[Arch Wiki - DaVinci Resolve](https://wiki.archlinux.org/title/DaVinci_Resolve)**
+
+#### For NVIDIA users:
+```bash
+sudo pacman -S opencl-nvidia
+```
+
+#### For AMD users:
+```bash
+sudo pacman -S opencl-amd
+```
+
+#### For Intel users:
+```bash
+sudo pacman -S intel-compute-runtime
+```
+
+### 3. Install DaVinci Resolve
+
+After downloading the `.zip` file from the Blackmagic Design website:
+
+1. Extract the archive
+2. Run the installer script (usually requires root privileges)
+3. Follow the installation prompts
+
+```bash
+unzip DaVinci_Resolve_*_Linux.zip
+cd DaVinci_Resolve_*_Linux
+sudo ./DaVinci_Resolve_*_Linux.sh
+```
+
+After installation, you can launch DaVinci Resolve from your application menu or by running:
+```bash
+/opt/resolve/bin/resolve
+```
+
+---
+
+## Troubleshooting
+
+### Symbol Lookup Error Fix
+
+If you encounter this error when launching DaVinci Resolve:
+
+```
+/opt/resolve/bin/resolve: symbol lookup error: /usr/lib/libpango-1.0.so.0: undefined symbol: g_once_init_leave_pointer
+```
+
+**Solution:** Disable conflicting libraries bundled with DaVinci Resolve:
+
+```bash
+cd /opt/resolve/libs
+sudo mkdir disabled-libraries
+sudo mv libglib* disabled-libraries
+sudo mv libgio* disabled-libraries
+sudo mv libgmodule* disabled-libraries
+```
+
+This forces DaVinci Resolve to use your system's versions of these libraries instead of the bundled ones.
+
+### Media Compatibility Issues
+
+**Problem:** The free version of DaVinci Resolve on Linux doesn't support:
+- H.264/H.265 video codecs
+- AAC audio codec
+
+**Why?** This is due to codec licensing restrictions for commercial use. FFMPEG and x264 are only licensed for personal use, and H.264/H.265 aren't commercially licensed on Linux distributions.
+
+**Solution:** Transcode your media files to a compatible format using the included script. This script converts media to ProRes 422 HQ, which is fully supported and provides excellent editing performance.
+
+> **Note:** While DNxHR is also a compatible format, this script uses ProRes 422 HQ for its superior quality and broad compatibility.
+
+---
+
+## Transcoding Script
+
+This repository includes a bash script that converts video and audio files to a format fully compatible with DaVinci Resolve.
+
+### What it does
+
+The script transcodes media files using the following FFmpeg parameters:
 - **Video Codec**: ProRes 422 HQ (`prores_ks` with profile 3)
 - **Audio Codec**: PCM 16-bit little-endian (`pcm_s16le`)
 - **Container**: QuickTime (.mov)
 
-This combination ensures maximum compatibility and quality for video editing in DaVinci Resolve.
+This combination ensures maximum compatibility and quality for video editing in DaVinci Resolve on Linux.
 
-## Prerequisites
+### Prerequisites
 
 - **FFmpeg** must be installed on your system
 - **Bash** shell (standard on most Linux distributions)
 
-### Installing FFmpeg
+#### Installing FFmpeg on Arch Linux
 
 ```bash
-# Ubuntu/Debian
-sudo apt update && sudo apt install ffmpeg
-
-# CentOS/RHEL/Fedora
-sudo dnf install ffmpeg
-
-# Arch Linux
 sudo pacman -S ffmpeg
 ```
 
-## Installation
+---
 
-### Method 1: System-wide Installation (Recommended)
+## Usage
 
-1. **Download the script** (or clone this repository)
+### Installing the Transcode Script
+
+#### Method 1: System-wide Installation (Recommended)
+
+1. **Clone this repository**:
+   ```bash
+   git clone https://github.com/Yousif-elkot/Davinci-resolve-on-arch.git
+   cd Davinci-resolve-on-arch
+   ```
+
 2. **Make it executable**:
    ```bash
    chmod +x transcode.sh
    ```
+
 3. **Create a symbolic link** for system-wide access:
    ```bash
-   sudo ln -sf /path/to/transcode.sh /usr/local/bin/davinci-transcode
+   sudo ln -sf $(pwd)/transcode.sh /usr/local/bin/davinci-transcode
    ```
-   Replace `/path/to/transcode.sh` with the actual path to your script.
 
 4. **Verify installation**:
    ```bash
@@ -51,26 +217,7 @@ sudo pacman -S ffmpeg
 
 Now you can use `davinci-transcode` from anywhere in your terminal!
 
-### Method 2: Add to PATH
-
-1. **Make the script executable**:
-   ```bash
-   chmod +x transcode.sh
-   ```
-
-2. **Add the script directory to your PATH**:
-   ```bash
-   echo 'export PATH="$PATH:/path/to/script/directory"' >> ~/.bashrc
-   source ~/.bashrc
-   ```
-   Replace `/path/to/script/directory` with the actual directory containing the script.
-
-3. **Test the installation**:
-   ```bash
-   transcode.sh --help
-   ```
-
-### Method 3: Local Installation
+#### Method 2: Local Usage
 
 Simply make the script executable and run it from its directory:
 ```bash
@@ -78,42 +225,40 @@ chmod +x transcode.sh
 ./transcode.sh --help
 ```
 
-## Usage
-
 ### Basic Usage
+
 ```bash
-# If installed system-wide (Method 1)
+# If installed system-wide
 davinci-transcode input_file.mp4
 
-# If added to PATH (Method 2) 
-transcode.sh input_file.mp4
-
-# If running locally (Method 3)
+# If running locally
 ./transcode.sh input_file.mp4
 ```
 
 ### Specify Output Directory
+
 ```bash
 # System-wide installation
 davinci-transcode input_file.mp4 /path/to/output/
-
-# PATH method
-transcode.sh input_file.mp4 /path/to/output/
 
 # Local execution
 ./transcode.sh input_file.mp4 /path/to/output/
 ```
 
 ### Examples
+
 ```bash
 # Convert a video file (output in same directory)
 davinci-transcode vacation_video.mp4
 
 # Convert with custom output directory
-davinci-transcode wedding.avi ./transcoded_files/
+davinci-transcode wedding.avi ~/Videos/transcoded/
 
 # Convert audio file
-davinci-transcode podcast.mp3 ./audio_for_davinci/
+davinci-transcode podcast.mp3 ~/Audio/for_davinci/
+
+# Process multiple files
+for file in *.mp4; do davinci-transcode "$file"; done
 ```
 
 ## Features
@@ -179,6 +324,45 @@ Error: No space left on device
 2. **Close unnecessary applications** to free up system resources
 3. **For batch processing**, process files one at a time to avoid overwhelming the system
 
+---
+
+## Alternative Solutions
+
+If you prefer other transcoding tools, you can also use:
+
+- **[Shutter Encoder](https://www.shutterencoder.com/)** - GUI application with preset profiles
+- **Custom FFmpeg scripts** - Many available online for specific workflows
+
+The advantage of this script is its simplicity, automation, and optimized settings for DaVinci Resolve.
+
+---
+
+## Contributing
+
+Found an issue or have a suggestion? Feel free to:
+- Open an issue on GitHub
+- Submit a pull request
+- Share your experience in the discussions
+
+---
+
+## Credits
+
+Created by [Yousif Elkot](https://github.com/Yousif-elkot)
+
+Special thanks to the Arch Linux community and the Blackmagic Design team.
+
+---
+
+## Additional Resources
+
+- [DaVinci Resolve Official Website](https://www.blackmagicdesign.com/products/davinciresolve)
+- [Arch Wiki - DaVinci Resolve](https://wiki.archlinux.org/title/DaVinci_Resolve)
+- [FFmpeg Documentation](https://ffmpeg.org/documentation.html)
+- [ProRes Codec Information](https://en.wikipedia.org/wiki/Apple_ProRes)
+
+---
+
 ## License
 
-This script is provided as-is for educational and professional use.
+This project is provided as-is for educational and professional use. Feel free to modify and distribute as needed.
