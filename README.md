@@ -13,7 +13,7 @@ A complete guide for installing and configuring DaVinci Resolve on Arch Linux, s
 - ✅ **GPU driver setup** with OpenCL support
 - ✅ **Common issues solved** with step-by-step fixes
 - ✅ **Automated transcoding script** for media compatibility
-- ✅ **ProRes 422 HQ conversion** for optimal editing performance
+- ✅ **DNxHR/ProRes conversion** with multiple quality options for optimal editing performance
 - ✅ **Codec licensing explained** - why H.264/H.265 don't work on Linux
 
 ## 🎬 Video Tutorial
@@ -156,9 +156,11 @@ This forces DaVinci Resolve to use your system's versions of these libraries ins
 
 **Why?** This is due to codec licensing restrictions for commercial use. FFMPEG and x264 are only licensed for personal use, and H.264/H.265 aren't commercially licensed on Linux distributions.
 
-**Solution:** Transcode your media files to a compatible format using the included script. This script converts media to ProRes 422 HQ, which is fully supported and provides excellent editing performance.
+**Solution:** Transcode your media files to a compatible format using the included script. The script supports multiple codecs with different quality/speed/size tradeoffs:
 
-> **Note:** While DNxHR is also a compatible format, this script uses ProRes 422 HQ for its superior quality and broad compatibility.
+- **DNxHR SQ** (Default) - Fastest encoding, smallest files (2-3x original size), excellent for 1080p editing
+- **DNxHR HQ/HQX** - Higher quality options
+- **ProRes LT/422/HQ** - Apple ProRes variants (larger files, slower encoding)
 
 ---
 
@@ -168,12 +170,16 @@ This repository includes a bash script that converts video and audio files to a 
 
 ### What it does
 
-The script transcodes media files using the following FFmpeg parameters:
-- **Video Codec**: ProRes 422 HQ (`prores_ks` with profile 3)
+The script transcodes media files to DaVinci Resolve-compatible formats with configurable quality levels:
+
+**Default (DNxHR SQ):**
+- **Video Codec**: DNxHR SQ (`dnxhd` with `dnxhr_sq` profile)
 - **Audio Codec**: PCM 16-bit little-endian (`pcm_s16le`)
 - **Container**: QuickTime (.mov)
+- **Speed**: Very fast (3-5x faster than ProRes HQ)
+- **File Size**: Reasonable (2-3x original H.264 size)
 
-This combination ensures maximum compatibility and quality for video editing in DaVinci Resolve on Linux.
+**Other Options:** ProRes LT/422/HQ, DNxHR HQ/HQX (see usage examples below)
 
 ### Prerequisites
 
@@ -228,37 +234,55 @@ chmod +x transcode.sh
 ### Basic Usage
 
 ```bash
-# If installed system-wide
+# Default (DNxHR SQ - fastest, smallest)
 davinci-transcode input_file.mp4
 
-# If running locally
+# Or locally
 ./transcode.sh input_file.mp4
 ```
+
+### Choose Different Codec
+
+```bash
+# DNxHR HQ (higher quality)
+davinci-transcode --codec dnxhr_hq input_file.mp4
+
+# ProRes 422 LT (smaller ProRes variant)
+davinci-transcode --codec prores_lt input_file.mp4
+
+# ProRes 422 HQ (largest/slowest, maximum quality)
+davinci-transcode --codec prores_hq input_file.mp4
+```
+
+**Available codecs:**
+- `dnxhr_sq` - **Recommended!** Fast, small files (2-3x original)
+- `dnxhr_hq` - Balanced quality/size (4-5x original)
+- `dnxhr_hqx` - High quality (6-8x original)
+- `prores_lt` - ProRes Light (3-4x original)
+- `prores_422` - ProRes Standard (5-7x original)
+- `prores_hq` - ProRes HQ (10-15x original)
 
 ### Specify Output Directory
 
 ```bash
-# System-wide installation
-davinci-transcode input_file.mp4 /path/to/output/
-
-# Local execution
-./transcode.sh input_file.mp4 /path/to/output/
+davinci-transcode input_file.mp4 ~/Videos/transcoded/
+davinci-transcode --codec dnxhr_hq input_file.mp4 ~/Videos/
 ```
 
 ### Examples
 
 ```bash
-# Convert a video file (output in same directory)
+# Convert with default settings (fastest)
 davinci-transcode vacation_video.mp4
 
-# Convert with custom output directory
-davinci-transcode wedding.avi ~/Videos/transcoded/
+# Convert with higher quality
+davinci-transcode --codec dnxhr_hq wedding.avi
 
-# Convert audio file
-davinci-transcode podcast.mp3 ~/Audio/for_davinci/
-
-# Process multiple files
+# Batch convert all MP4 files
 for file in *.mp4; do davinci-transcode "$file"; done
+
+# Convert with custom output directory
+davinci-transcode --codec prores_lt project.mov ~/Videos/transcoded/
 ```
 
 ## Features
@@ -274,16 +298,26 @@ for file in *.mp4; do davinci-transcode "$file"; done
 
 ## Output Format Details
 
-The script uses these specific FFmpeg parameters for DaVinci Resolve compatibility:
+### Default (DNxHR SQ)
 
 ```bash
-ffmpeg -i input_file.mp4 -c:v prores_ks -profile:v 3 -c:a pcm_s16le output_file.mov
+ffmpeg -i input_file.mp4 -c:v dnxhd -profile:v dnxhr_sq -c:a pcm_s16le output_file.mov
 ```
 
-- **`-c:v prores_ks`**: Uses ProRes encoder (high quality, editing-friendly)
-- **`-profile:v 3`**: ProRes 422 HQ profile (best quality for editing)
+- **`-c:v dnxhd`**: DNxHD/DNxHR codec (fast, efficient, editing-friendly)
+- **`-profile:v dnxhr_sq`**: Standard Quality profile (excellent for 1080p/4K)
 - **`-c:a pcm_s16le`**: Uncompressed 16-bit PCM audio (no quality loss)
 - **`.mov` container**: QuickTime format preferred by DaVinci Resolve
+
+### ProRes Example
+
+```bash
+ffmpeg -i input_file.mp4 -c:v prores_ks -profile:v 2 -c:a pcm_s16le output_file.mov
+```
+
+- **`-c:v prores_ks`**: ProRes encoder (high quality, editing-friendly)
+- **`-profile:v 1/2/3`**: ProRes LT (1), 422 (2), or HQ (3)
+- Larger files but maximum compatibility
 
 ## Supported Input Formats
 
@@ -293,10 +327,25 @@ The script can handle most common video and audio formats including:
 
 ## File Size Considerations
 
-ProRes files are significantly larger than compressed formats like H.264:
-- **Typical increase**: 5-10x larger than original MP4 files
-- **Benefits**: No generational loss, smooth playback, better editing performance
-- **Storage**: Ensure adequate disk space before transcoding
+Intermediate codecs create larger files than H.264/H.265, but are much better for editing:
+
+### DNxHR (Recommended)
+- **DNxHR SQ**: 2-3x larger than original H.264 (100MB → 200-300MB) ⚡ **Fastest!**
+- **DNxHR HQ**: 4-5x larger (100MB → 400-500MB)
+- **DNxHR HQX**: 6-8x larger (100MB → 600-800MB)
+
+### ProRes
+- **ProRes LT**: 3-4x larger (100MB → 300-400MB)
+- **ProRes 422**: 5-7x larger (100MB → 500-700MB)
+- **ProRes HQ**: 10-15x larger (100MB → 1-1.5GB) ⚠️ **Very slow!**
+
+**Benefits:**
+- ✅ No generational loss during editing
+- ✅ Smooth real-time playback
+- ✅ Better color grading performance
+- ✅ Faster rendering
+
+**Recommendation:** Use **DNxHR SQ** for most projects. Only use ProRes HQ if you need maximum quality for color grading.
 
 ## Troubleshooting
 

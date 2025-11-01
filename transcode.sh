@@ -1,29 +1,46 @@
 #!/usr/bin/bash
 
 # Transcoder script for DaVinci Resolve
-# Converts video/audio files to ProRes format compatible with DaVinci Resolve
+# Converts video/audio files to DNxHR/ProRes format compatible with DaVinci Resolve
 
 # Color codes for output
 RED='\033[0;31m'
 GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
 BLUE='\033[0;34m'
+CYAN='\033[0;36m'
 NC='\033[0m' # No Color
+
+# Default codec (can be changed with --codec option)
+CODEC_CHOICE="dnxhr_sq"
 
 # Function to display usage
 show_usage() {
     echo -e "${BLUE}DaVinci Resolve Transcoder${NC}"
     echo ""
-    echo "Usage: $0 <input_file> [output_directory]"
+    echo "Usage: $0 [options] <input_file> [output_directory]"
+    echo ""
+    echo "Options:"
+    echo "  --codec <codec>  - Choose codec (default: dnxhr_sq)"
+    echo "                     Available: dnxhr_sq, dnxhr_hq, dnxhr_hqx, prores_lt, prores_422, prores_hq"
+    echo "  --help, -h       - Show this help message"
     echo ""
     echo "Parameters:"
     echo "  input_file       - Video or audio file to transcode"
     echo "  output_directory - (Optional) Directory for output file. Default: same as input"
     echo ""
+    echo "Codec Comparison (1080p footage):"
+    echo -e "  ${CYAN}dnxhr_sq${NC}     - FASTEST, smallest (2-3x original size) - Recommended!"
+    echo -e "  ${CYAN}dnxhr_hq${NC}     - Balanced quality/size (4-5x original)"
+    echo -e "  ${CYAN}dnxhr_hqx${NC}    - High quality (6-8x original)"
+    echo -e "  ${CYAN}prores_lt${NC}    - ProRes Light, smaller (3-4x original)"
+    echo -e "  ${CYAN}prores_422${NC}   - ProRes Standard (5-7x original)"
+    echo -e "  ${CYAN}prores_hq${NC}    - ProRes HQ, largest/slowest (10-15x original)"
+    echo ""
     echo "Examples:"
-    echo "  $0 video.mp4"
-    echo "  $0 video.mp4 /path/to/output/"
-    echo "  $0 audio.wav ./transcoded/"
+    echo "  $0 video.mp4                              # Use DNxHR SQ (fastest)"
+    echo "  $0 --codec dnxhr_hq video.mp4             # Use DNxHR HQ"
+    echo "  $0 --codec prores_lt video.mp4 ~/Videos/  # Use ProRes LT"
     echo ""
     echo "Supported formats: mp4, avi, mkv, mov, m4v, wmv, flv, webm, wav, mp3, aac, etc."
 }
@@ -85,20 +102,52 @@ get_file_size() {
     fi
 }
 
+# Function to get ffmpeg codec parameters based on choice
+get_codec_params() {
+    local codec="$1"
+    case "$codec" in
+        dnxhr_sq)
+            echo "-c:v dnxhd -profile:v dnxhr_sq"
+            ;;
+        dnxhr_hq)
+            echo "-c:v dnxhd -profile:v dnxhr_hq"
+            ;;
+        dnxhr_hqx)
+            echo "-c:v dnxhd -profile:v dnxhr_hqx"
+            ;;
+        prores_lt)
+            echo "-c:v prores_ks -profile:v 1"
+            ;;
+        prores_422)
+            echo "-c:v prores_ks -profile:v 2"
+            ;;
+        prores_hq)
+            echo "-c:v prores_ks -profile:v 3"
+            ;;
+        *)
+            echo "-c:v dnxhd -profile:v dnxhr_sq"
+            ;;
+    esac
+}
+
 # Function to perform the transcoding
 transcode_file() {
     local input_file="$1"
     local output_file="$2"
+    local codec="$3"
     
     echo -e "${BLUE}Starting transcoding...${NC}"
+    echo "Codec:  $codec"
     echo "Input:  $input_file ($(get_file_size "$input_file"))"
     echo "Output: $output_file"
     echo ""
     
+    # Get codec parameters
+    local codec_params=$(get_codec_params "$codec")
+    
     # Show ffmpeg progress and capture any errors
     ffmpeg -i "$input_file" \
-           -c:v prores_ks \
-           -profile:v 3 \
+           $codec_params \
            -c:a pcm_s16le \
            -y \
            "$output_file" 2>&1 | while IFS= read -r line; do
@@ -129,15 +178,43 @@ transcode_file() {
 
 # Main script execution
 main() {
-    # Parse command line arguments
-    local input_file="$1"
-    local output_dir="$2"
+    local codec="$CODEC_CHOICE"
+    local input_file=""
+    local output_dir=""
     
-    # Show help if requested
-    if [[ "$1" == "-h" || "$1" == "--help" || "$1" == "help" ]]; then
-        show_usage
-        exit 0
-    fi
+    # Parse command line arguments
+    while [[ $# -gt 0 ]]; do
+        case "$1" in
+            -h|--help|help)
+                show_usage
+                exit 0
+                ;;
+            --codec)
+                codec="$2"
+                shift 2
+                ;;
+            *)
+                if [[ -z "$input_file" ]]; then
+                    input_file="$1"
+                else
+                    output_dir="$1"
+                fi
+                shift
+                ;;
+        esac
+    done
+    
+    # Validate codec choice
+    case "$codec" in
+        dnxhr_sq|dnxhr_hq|dnxhr_hqx|prores_lt|prores_422|prores_hq)
+            # Valid codec
+            ;;
+        *)
+            echo -e "${RED}Error: Invalid codec '$codec'${NC}"
+            echo "Valid options: dnxhr_sq, dnxhr_hq, dnxhr_hqx, prores_lt, prores_422, prores_hq"
+            exit 1
+            ;;
+    esac
     
     # Check prerequisites
     check_ffmpeg
@@ -174,12 +251,21 @@ main() {
     echo -e "${BLUE}=== DaVinci Resolve Transcoder ===${NC}"
     echo ""
     
-    transcode_file "$input_file" "$output_file"
+    transcode_file "$input_file" "$output_file" "$codec"
     
     if [[ $? -eq 0 ]]; then
         echo ""
         echo -e "${GREEN}All done! Your file is ready for DaVinci Resolve.${NC}"
-        echo "Format: ProRes 422 HQ with PCM 16-bit audio"
+        
+        # Display codec info
+        case "$codec" in
+            dnxhr_*)
+                echo "Format: DNxHR (${codec#dnxhr_}) with PCM 16-bit audio"
+                ;;
+            prores_*)
+                echo "Format: Apple ProRes (${codec#prores_}) with PCM 16-bit audio"
+                ;;
+        esac
         exit 0
     else
         exit 1
